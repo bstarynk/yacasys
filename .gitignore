@@ -4,4 +4,10 @@
 *bak
 *orig
 *log
+src/*~
+src/*orig
+src/*bak
+obj/*.o
+obj/*.so
 yacasys.fcgi
+core*

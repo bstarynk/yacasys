@@ -6,8 +6,8 @@ CFLAGS= -std=gnu99 -Wall -pthread -I /usr/local/include/ $(OPTIMFLAGS)
 LIBES= -L /usr/local/lib -ljansson -lfcgi -lrt -lm  -lcrypt -ldl
 CSOURCES= $(wildcard src/[a-z]*.c)
 MODSOURCES= $(wildcard src/[1-9_][^_]*.c)
-COBJECTS= $(patsubst %.c, %.o, $(CSOURCES))
-MODULES= $(patsubstr %.c, %.so, $(MODSOURCES))
+COBJECTS= $(patsubst src/%.c, obj/%.o, $(CSOURCES))
+MODULES= $(patsubstr src/%.c, obj/%.so, $(MODSOURCES))
 RM= rm -vf
 INDENT= indent -gnu
 all: yacasys.fcgi
@@ -19,7 +19,7 @@ modules: $(MODULES)
 .SUFFIXES: .so
 
 clean:
-	$(RM) src/*.o src/*~ src/*orig src/*bak src/*so yacasys.fcgi *log
+	$(RM) obj/*.o src/*~ src/*orig src/*bak obj/*so yacasys.fcgi *log __*.c __*.o
 
 yacasys.fcgi: $(COBJECTS)  __buildstamp__.c
 	$(LINK.c) -rdynamic $^ -o $@-tmp $(LIBES) && mv -f $@-tmp $@
@@ -28,8 +28,12 @@ yacasys.fcgi: $(COBJECTS)  __buildstamp__.c
 __buildstamp__.c:
 	date +'const char yaca_build_timestamp[]="%Y %b %d %H:%M:%S %Z";' > $@
 
-%.so: %.c src/yaca.h
+obj/%.so: src/%.c src/yaca.h
 	$(COMPILE.c) -fPIC -shared $< -o $@ 
+
+obj/%.o: src/%.c src/yaca.h
+	$(COMPILE.c) $< -o $@
+
 $(COBJECTS): src/yaca.h
 
 indent:

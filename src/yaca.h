@@ -1,4 +1,4 @@
-/** file yacasys/yaca.h
+/** file yacasys/src/yaca.h
 
      Copyright (C) 2012 Basile Starynkevitch <basile@starynkevitch.net>
 
@@ -35,13 +35,22 @@
 #include <string.h>
 #include <jansson.h>
 #include <pthread.h>
+#include <signal.h>
+#include <assert.h>
+#include <errno.h>
 
 #define YACA_MAX_WORKERS 16
 #define YACA_MAX_TYPENUM 4096
 
-#define YACA_FATAL(Fmt,...) do {pthread_mutex_lock(&yaca_syslog_mutex); \
-    syslog(LOG_CRIT,"[%s:%d] FATAL: " Fmt, __FILE__, __LINE__,		\
-	   ##__VA_ARGS__); abort(); }while(0)
+#define YACA_FATAL(Fmt,...) do {				\
+    fprintf(stderr, "YACA FATAL [%s:%d] " Fmt "\n",		\
+	    __FILE__, __LINE__,					\
+	    ##__VA_ARGS__);					\
+    fflush (NULL);						\
+    pthread_mutex_lock (&yaca_syslog_mutex);			\
+    syslog(LOG_CRIT,"[%s:%d] FATAL: " Fmt, __FILE__, __LINE__,	\
+	   ##__VA_ARGS__);					\
+    abort(); }while(0)
 
 #define YACA_LIKELY(C) !__builtin_expect(0,!(C))
 #define YACA_UNLIKELY(C) __builtin_expect(0,(C))
@@ -56,9 +65,12 @@ extern char yaca_hostname[];
 extern char yaca_build_timestamp[];
 extern const char *yaca_progname;
 extern const char *yaca_users_base;
-extern const char *yaca_state_file;
+extern const char *yaca_data_dir;
+extern const char *yaca_source_dir;
+extern const char *yaca_object_dir;
 extern unsigned yaca_nb_workers;
 extern pthread_mutex_t yaca_syslog_mutex;
+extern volatile sig_atomic_t yaca_interrupt;
 
 // pseudo-random number generator, like random(3), lrand48(3),
 // drand48(3) but with a mutex
@@ -70,49 +82,88 @@ double yaca_drand48 (void);
 typedef uint32_t yaca_id_t;
 typedef uint16_t yaca_typenum_t;
 typedef uint16_t yaca_mark_t;
+typedef uint16_t yaca_spacenum_t;
 struct yaca_item_st;
 struct yaca_itemtype_st;
+struct yaca_dumper_st;
+struct yaca_tupleitems_st;
 
 typedef struct yaca_item_st *yaca_loaditem_sig_t (json_t *, yaca_id_t);
 typedef void yaca_fillitem_sig_t (json_t *, struct yaca_item_st *);
 typedef json_t *yaca_dumpitem_sig_t (struct yaca_item_st *);
 typedef json_t *yaca_dumpcontent_sig_t (struct yaca_item_st *);
 typedef int yaca_runitem_sig_t (struct yaca_item_st *);
+typedef void yaca_scandump_sig_t (struct yaca_item_st *,
+				  struct yaca_dumper_st *);
 
+///// items
+
+#define YACA_ITEM_MAGIC 971394241	/*0x39e64cc1 */
 struct yaca_item_st
 {
-  uint32_t itm_magic;
+  uint32_t itm_magic;		/* always YACA_ITEM_MAGIC */
   yaca_id_t itm_id;
   yaca_typenum_t itm_typnum;
-  yaca_mark_t itm_mark;
+  yaca_spacenum_t itm_spacnum;
   pthread_mutex_t itm_mutex;
   long itm_dataspace[];
 };
-#define YACA_ITEM_MAGIC 971394241	/*0x39e64cc1 */
 #define YACA_ITEM_MAX_SIZE (256*1024*sizeof(void*))
 
+struct yaca_item_st *yaca_item_make (yaca_typenum_t typnum,
+				     yaca_spacenum_t spacenum,
+				     unsigned extrasize);
+struct yaca_item_st *yaca_item_build (yaca_typenum_t typnum,
+				      yaca_spacenum_t spacenum,
+				      unsigned extrasize, yaca_id_t id);
+struct yaca_item_st *yaca_item_of_id (yaca_id_t id);
+
+struct yaca_tupleitems_st
+{
+  unsigned tup_len;
+  struct yaca_item_st *tup_items[];
+};
+
+///// types
+#define YACA_TYPE_MAGIC 657176525	/* 0x272bb7cd */
 struct yaca_itemtype_st
 {
-  uint32_t typ_magic;
+  uint32_t typ_magic;		/* always YACA_TYPE_MAGIC */
   yaca_typenum_t typ_num;
   const char *typ_name;
   struct ya_item_t *typ_item;
   yaca_loaditem_sig_t *typr_loaditem;
   yaca_fillitem_sig_t *typr_fillitem;
+  yaca_scandump_sig_t *typr_scandump;
   yaca_dumpitem_sig_t *typr_dumpitem;
   yaca_dumpcontent_sig_t *typr_dumpcontent;
   yaca_runitem_sig_t *typr_runitem;
   void *typ_spare_[10];
 };
-
 #define YACA_ITEM_MAX_TYPE 4096
 extern struct yaca_itemtype_st *yaca_typetab[];
 
-struct yaca_item_st *yaca_item_make (yaca_typenum_t typnum,
-				     unsigned extrasize);
-struct yaca_item_st *yaca_item_build (yaca_typenum_t typnum,
-				      unsigned extrasize, yaca_id_t id);
-struct yaca_item_st *yaca_item_of_id (yaca_id_t id);
+
+///// spaces
+#define YACA_SPACE_MAGIC 327731843	/* 0x1388ca83 */
+struct yaca_space_st
+{
+  uint32_t spa_magic;
+  yaca_spacenum_t spa_num;
+  const char *spa_name;
+  struct yaca_spacedata_st *spa_data;
+};
+#define YACA_MAX_SPACE 1024
+extern struct yaca_space_st *yaca_spacetab[];
+
+
+void yaca_load (void);
+
+void yaca_start_agenda (void);
+
+void yaca_interrupt_agenda (void);
+
+void yaca_stop_agenda (void);
 
 #endif /* _YACA_H_INCLUDED_ */
 /* eof yacasys/yaca.h */
