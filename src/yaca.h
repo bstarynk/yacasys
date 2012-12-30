@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <fastcgi.h>
 #include <unistd.h>
 #include <time.h>
@@ -38,6 +39,7 @@
 #include <signal.h>
 #include <assert.h>
 #include <errno.h>
+#include <limits.h>
 
 #define YACA_MAX_WORKERS 16
 #define YACA_MAX_TYPENUM 4096
@@ -78,6 +80,8 @@ int32_t yaca_random (void);
 long yaca_lrand48 (void);
 double yaca_drand48 (void);
 
+// give a prime number above some given threshold, or 0 if not found
+unsigned long yaca_prime_after (unsigned long l);
 
 typedef uint32_t yaca_id_t;
 typedef uint16_t yaca_typenum_t;
@@ -160,10 +164,27 @@ extern struct yaca_space_st *yaca_spacetab[];
 void yaca_load (void);
 
 void yaca_start_agenda (void);
-
 void yaca_interrupt_agenda (void);
-
 void yaca_stop_agenda (void);
+enum yaca_taskprio_en
+{
+  tkprio__none,
+  tkprio_low,
+  tkprio_normal,
+  tkprio_high,
+  tkprio__last
+};
+
+
+// return false if failed to add or move
+bool yaca_agenda_add_back (struct yaca_item_st *itmtask,
+			   enum yaca_taskprio_en prio);
+// return false if failed to add or move
+bool yaca_agenda_add_front (struct yaca_item_st *itmtask,
+			    enum yaca_taskprio_en prio);
+// return false if failed to remove
+bool yaca_agenda_remove (struct yaca_item_st *itmtask);
+enum yaca_taskprio_en yaca_agenda_task_prio (struct yaca_item_st *itmtask);
 
 #endif /* _YACA_H_INCLUDED_ */
 /* eof yacasys/yaca.h */
