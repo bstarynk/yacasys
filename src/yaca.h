@@ -96,7 +96,7 @@ typedef struct yaca_item_st *yaca_loaditem_sig_t (json_t *, yaca_id_t);
 typedef void yaca_fillitem_sig_t (json_t *, struct yaca_item_st *);
 typedef json_t *yaca_dumpitem_sig_t (struct yaca_item_st *);
 typedef json_t *yaca_dumpcontent_sig_t (struct yaca_item_st *);
-typedef int yaca_runitem_sig_t (struct yaca_item_st *);
+typedef void yaca_runitem_sig_t (struct yaca_item_st *);
 typedef void yaca_scandump_sig_t (struct yaca_item_st *,
 				  struct yaca_dumper_st *);
 
@@ -182,8 +182,12 @@ bool yaca_agenda_add_back (struct yaca_item_st *itmtask,
 // return false if failed to add or move
 bool yaca_agenda_add_front (struct yaca_item_st *itmtask,
 			    enum yaca_taskprio_en prio);
-// return false if failed to remove
-bool yaca_agenda_remove (struct yaca_item_st *itmtask);
+
+// remove a task item, return tkprio__none if failed to remove else
+// its old priority
+enum yaca_taskprio_en yaca_agenda_remove (struct yaca_item_st *itmtask);
+
+// query the priority of an item, or tkprio__none if not found
 enum yaca_taskprio_en yaca_agenda_task_prio (struct yaca_item_st *itmtask);
 
 #endif /* _YACA_H_INCLUDED_ */
