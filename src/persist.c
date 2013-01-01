@@ -1,6 +1,6 @@
 /** file yacasys/src/persist.c
 
-     Copyright (C) 2012 Basile Starynkevitch <basile@starynkevitch.net>
+     Copyright (C) 2013 Basile Starynkevitch <basile@starynkevitch.net>
 
      This file is part of YacaSys
 

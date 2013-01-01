@@ -1,6 +1,6 @@
 /** file yacasys/src/main.c
 
-     Copyright (C) 2012 Basile Starynkevitch <basile@starynkevitch.net>
+     Copyright (C) 2013 Basile Starynkevitch <basile@starynkevitch.net>
 
      This file is part of YacaSys
 
@@ -438,7 +438,6 @@ main (int argc, char **argv)
   else if (yaca_nb_workers > YACA_MAX_WORKERS)
     yaca_nb_workers = YACA_MAX_WORKERS;
   initialize_random ();
-  initialize_items ();
   if (nice_level)
     nice (nice_level);
   openlog ("yacasys", LOG_PID, LOG_DAEMON);
@@ -467,4 +466,6 @@ main (int argc, char **argv)
 	YACA_FATAL ("failed to open pid path %s - %s",
 		    pid_file_path, strerror (errno));
     }
+  yaca_initialize_memgc ();
+  initialize_items ();
 }

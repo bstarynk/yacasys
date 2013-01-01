@@ -1,6 +1,6 @@
 /** file yacasys/src/agenda.c
 
-     Copyright (C) 2012 Basile Starynkevitch <basile@starynkevitch.net>
+     Copyright (C) 2013 Basile Starynkevitch <basile@starynkevitch.net>
 
      This file is part of YacaSys
 
@@ -37,6 +37,8 @@
    this task run usually update the agenda).
 **/
 
+__thread struct yaca_worker_st *yaca_this_worker;
+
 #define YACA_WORKER_MAGIC 471856441	/*0x1c1ff539 */
 struct yaca_worker_st
 {
@@ -50,7 +52,7 @@ struct yaca_worker_st
 
 #define YACA_WORKER_SIGNAL SIGALRM
 #define YACA_WORKER_TICKMILLISEC 25	/* milliseconds */
-static __thread struct yaca_worker_st *yaca_this_worker;
+
 
 struct yaca_worker_st yaca_worktab[YACA_MAX_WORKERS + 1];
 
@@ -196,6 +198,7 @@ yaca_work_alarm_sigaction (int sig, siginfo_t * sinf, void *data)
 void *
 yaca_worker_work (void *d)
 {
+  long cnt = 0;
   struct yaca_worker_st *tsk = (struct yaca_worker_st *) d;
   if (!tsk || tsk->worker_magic != YACA_WORKER_MAGIC)
     YACA_FATAL ("invalid worker@%p", tsk);
@@ -220,7 +223,13 @@ yaca_worker_work (void *d)
   sched_yield ();
   for (;;)
     {
-      yaca_do_one_task ();
+      if (yaca_do_one_task ())
+	{
+	  break;
+	}
+      cnt++;
+      if (YACA_UNLIKELY (cnt % 1024 == 0))
+	sched_yield ();
     }
 #warning incomplete yaca_worker_work
 }
@@ -243,7 +252,6 @@ initialize_agenda (unsigned sizlow)
   unsigned long primsiz = yaca_prime_after (sizlow + 10);
   if (YACA_UNLIKELY (primsiz < sizlow || primsiz > UINT_MAX))
     YACA_FATAL ("cannot initialize agenda of %u elements", sizlow);
-  memset (&agenda, 0, sizeof (agenda));
   agenda.ag_count = 0;
   agenda.ag_size = primsiz;
   struct yaca_agentry_st *arr =
@@ -684,4 +692,17 @@ end:
 	}
     }
   return res;
+}
+
+
+void
+yaca_agenda_stop (void)
+{
+  pthread_mutex_lock (&yaca_agenda_mutex);
+  agenda.ag_state = yacag_stop;
+  pthread_cond_broadcast (&yaca_agendachanged_cond);
+  goto end;
+end:
+  pthread_mutex_unlock (&yaca_agenda_mutex);
+#warning should wait for all workers to stop
 }

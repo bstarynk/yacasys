@@ -1,6 +1,6 @@
 /** file yacasys/src/yaca.h
 
-     Copyright (C) 2012 Basile Starynkevitch <basile@starynkevitch.net>
+     Copyright (C) 2013 Basile Starynkevitch <basile@starynkevitch.net>
 
      This file is part of YacaSys
 
@@ -40,6 +40,8 @@
 #include <assert.h>
 #include <errno.h>
 #include <limits.h>
+#include <sys/mman.h>
+#include <sys/time.h>
 
 #define YACA_MAX_WORKERS 16
 #define YACA_MAX_TYPENUM 4096
@@ -91,6 +93,8 @@ struct yaca_item_st;
 struct yaca_itemtype_st;
 struct yaca_dumper_st;
 struct yaca_tupleitems_st;
+struct yaca_worker_st;		/* in agenda.c */
+extern __thread struct yaca_worker_st *yaca_this_worker;
 
 typedef struct yaca_item_st *yaca_loaditem_sig_t (json_t *, yaca_id_t);
 typedef void yaca_fillitem_sig_t (json_t *, struct yaca_item_st *);
@@ -189,6 +193,13 @@ enum yaca_taskprio_en yaca_agenda_remove (struct yaca_item_st *itmtask);
 
 // query the priority of an item, or tkprio__none if not found
 enum yaca_taskprio_en yaca_agenda_task_prio (struct yaca_item_st *itmtask);
+
+// stop the agenda
+void yaca_agenda_stop (void);
+
+
+// initialize memory management & garbage collection
+void yaca_initialize_memgc (void);
 
 #endif /* _YACA_H_INCLUDED_ */
 /* eof yacasys/yaca.h */
