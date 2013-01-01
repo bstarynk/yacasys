@@ -23,6 +23,8 @@
 #include "yaca.h"
 
 
+__thread struct yaca_worker_st *yaca_this_worker;
+
 /**
    We have a small number of worker threads; each worker thread is
    "interruptible" (either by a timer, every few milliseconds, or by
@@ -37,42 +39,12 @@
    this task run usually update the agenda).
 **/
 
-__thread struct yaca_worker_st *yaca_this_worker;
-
-#define YACA_WORKER_MAGIC 471856441	/*0x1c1ff539 */
-struct yaca_worker_st
-{
-  uint32_t worker_magic;
-  int16_t worker_num;
-  uint16_t worker_state;
-  pthread_t worker_thread;
-  timer_t worker_timer;
-  volatile sig_atomic_t worker_interrupted;
-};
-
-#define YACA_WORKER_SIGNAL SIGALRM
-#define YACA_WORKER_TICKMILLISEC 25	/* milliseconds */
 
 
 struct yaca_worker_st yaca_worktab[YACA_MAX_WORKERS + 1];
 
 
 
-
-enum yacaspecworker_en
-{
-  yacaworker__none,
-  yacaworker_gc,
-  yacaworker_fcgi,
-  yacaworker__last
-};
-
-
-enum yaca_agenda_state_en
-{
-  yacag_stop = 0,
-  yacag_run,
-};
 
 static pthread_mutex_t yaca_agenda_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t yaca_agendachanged_cond = PTHREAD_COND_INITIALIZER;

@@ -37,6 +37,7 @@ volatile sig_atomic_t yaca_interrupt;
 
 static struct option yaca_options[] = {
   {"help", no_argument, NULL, 'h'},
+  {"daemonize", no_argument, NULL, 'd'},
   {"workers", required_argument, NULL, 'w'},
   {"usersbase", required_argument, NULL, 'u'},
   {"pidfile", required_argument, NULL, 'p'},
@@ -53,6 +54,7 @@ struct drand48_data yaca_rand48_data;
 static pthread_mutex_t yaca_random_mutex = PTHREAD_MUTEX_INITIALIZER;
 static const char *pid_file_path;
 static int nice_level;
+static bool should_daemonize;
 
 static struct
 {
@@ -77,6 +79,7 @@ print_usage (void)
 {
   printf ("Usage: %s\n", yaca_progname);
   printf ("\t -h | --help " " \t# Give this help.\n");
+  printf ("\t -D | --daemonize " " \t# daemonize this process.\n");
   printf ("\t -w | --workers <nb-workers> "
 	  " \t# Number of working threads.\n");
   printf ("\t -u | --usersbase <users-file> " " \t# file of HTTP users.\n");
@@ -102,7 +105,7 @@ parse_program_arguments (int argc, char **argv)
 {
   int opt = -1;
   while ((opt =
-	  getopt_long (argc, argv, "hw:u:p:d:s:o:n:", yaca_options,
+	  getopt_long (argc, argv, "hDw:u:p:d:s:o:n:", yaca_options,
 		       NULL)) >= 0)
     {
       switch (opt)
@@ -111,6 +114,9 @@ parse_program_arguments (int argc, char **argv)
 	  print_usage ();
 	  exit (EXIT_SUCCESS);
 	  return;
+	case 'D':
+	  should_daemonize = true;
+	  break;
 	case 'w':
 	  if (optarg)
 	    yaca_nb_workers = atoi (optarg);
@@ -440,6 +446,8 @@ main (int argc, char **argv)
   initialize_random ();
   if (nice_level)
     nice (nice_level);
+  if (should_daemonize)
+    daemon (false, false);
   openlog ("yacasys", LOG_PID, LOG_DAEMON);
   {
     char nowbuf[64];

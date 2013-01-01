@@ -164,7 +164,88 @@ struct yaca_space_st
 #define YACA_MAX_SPACE 1024
 extern struct yaca_space_st *yaca_spacetab[];
 
+// memory region
+#define YACA_SMALLREGION_MAGIC 1379233909	/* 0x52357075 */
+#define YACA_BIGREGION_MAGIC 1260589607	/* 0x4b231227 */
 
+// region sizes are large power of two, and are aligned to their size */
+#define SMALLREGION_LOG 20
+#define BIGREGION_LOG 24
+#define YACA_SMALLREGION_SIZE (1<<SMALLREGION_LOG)	/* 1Megabyte */
+#define YACA_BIGREGION_SIZE (8<<BIGREGION_LOG)	/*16Megabytes */
+
+#define YACA_MINALIGNMENT __BIGGEST_ALIGNMENT__	/* 16 bytes on x86-64/Linux */
+struct yaca_region_st
+{
+  unsigned reg_magic;		/* YACA_SMALLREGION_MAGIC or
+				   YACA_BIGREGION_MAGIC */
+  unsigned reg_index;		/* index in smallregion or bigregion */
+  uint16_t reg_state;
+  uint64_t reg_spare1;
+  uint64_t reg_spare2;
+  uint64_t reg_spare3;
+  void *reg_free;
+  struct yaca_region_st *reg_next;
+  void *reg_end;
+  long long reg_data[] __attribute__ ((aligned (YACA_MINALIGNMENT)));
+};
+#define YACA_REGION_EMPTY ((struct yaca_region_st*)-1L)
+
+// quickly allocate in a region -without any locking- or NULL if full
+static inline void *
+yaca_allocate_in_region (struct yaca_region_st *reg, unsigned siz)
+{
+  if (!reg || !siz)
+    return NULL;
+  assert (reg->reg_magic == YACA_SMALLREGION_MAGIC
+	  || reg->reg_magic == YACA_BIGREGION_MAGIC);
+  if (YACA_UNLIKELY (siz % YACA_MINALIGNMENT != 0))
+    siz = (siz | (YACA_MINALIGNMENT - 1)) + 1;
+  void *p = reg->reg_free;
+  if (YACA_LIKELY ((char *) p + siz < (char *) reg->reg_end))
+    {
+      reg->reg_free = (char *) p + siz;
+      return p;
+    }
+  return NULL;
+}
+
+
+
+
+////////////////////////////////////////////////////////////////
+/// agenda
+
+enum yacaspecworker_en
+{
+  yacaworker__none,
+  yacaworker_gc,
+  yacaworker_fcgi,
+  yacaworker__last
+};
+
+
+enum yaca_agenda_state_en
+{
+  yacag_stop = 0,
+  yacag_run,
+};
+
+
+#define YACA_WORKER_MAGIC 471856441	/*0x1c1ff539 */
+struct yaca_worker_st
+{
+  uint32_t worker_magic;
+  int16_t worker_num;
+  uint16_t worker_state;
+  pthread_t worker_thread;
+  timer_t worker_timer;
+  struct yaca_region_st *worker_region;
+  volatile sig_atomic_t worker_interrupted;
+};
+
+#define YACA_WORKER_SIGNAL SIGALRM
+#define YACA_WORKER_TICKMILLISEC 25	/* milliseconds */
 void yaca_load (void);
 
 void yaca_start_agenda (void);
@@ -200,6 +281,12 @@ void yaca_agenda_stop (void);
 
 // initialize memory management & garbage collection
 void yaca_initialize_memgc (void);
+
+// allocate from a worker (preferably), and ask for GC when needed
+void *yaca_work_allocate (unsigned siz);
+
+// signal that a garbage collection is needed
+void yaca_should_garbage_collect (void);
 
 #endif /* _YACA_H_INCLUDED_ */
 /* eof yacasys/yaca.h */
