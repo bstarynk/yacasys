@@ -231,6 +231,12 @@ enum yaca_agenda_state_en
   yacag_run,
 };
 
+enum yaca_interrupt_reason_en
+{
+  yaint__none = 0,
+  yaint_gc,
+  yaint__last
+};
 
 #define YACA_WORKER_MAGIC 471856441	/*0x1c1ff539 */
 struct yaca_worker_st
@@ -240,6 +246,7 @@ struct yaca_worker_st
   uint16_t worker_state;
   pthread_t worker_thread;
   timer_t worker_timer;
+  uint32_t worker_need;
   struct yaca_region_st *worker_region;
   volatile sig_atomic_t worker_interrupted;
 };
@@ -249,7 +256,7 @@ struct yaca_worker_st
 void yaca_load (void);
 
 void yaca_start_agenda (void);
-void yaca_interrupt_agenda (void);
+void yaca_interrupt_agenda (enum yaca_interrupt_reason_en reason);
 void yaca_stop_agenda (void);
 enum yaca_taskprio_en
 {
@@ -287,6 +294,14 @@ void *yaca_work_allocate (unsigned siz);
 
 // signal that a garbage collection is needed
 void yaca_should_garbage_collect (void);
+
+
+// the work routine of the gc thread; argument is the struct
+// yaca_worker_st of the GC thread
+void *yaca_gcthread_work (void *);
+
+// this is called by worker threads when GC is needed
+void yaca_worker_garbcoll (void);
 
 #endif /* _YACA_H_INCLUDED_ */
 /* eof yacasys/yaca.h */

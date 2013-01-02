@@ -220,8 +220,8 @@ yaca_new_smallregion (void)
 {
   struct yaca_region_st *reg = NULL;
   pthread_mutex_lock (&yaca_memory_mutex);
-  if (YACA_UNLIKELY(4*smallregion.count + 50 > 3*smallregion.size))
-    reorganize_smallregion (smallregion.count/8+20);
+  if (YACA_UNLIKELY (4 * smallregion.count + 50 > 3 * smallregion.size))
+    reorganize_smallregion (smallregion.count / 8 + 20);
   // allocate the region
   {
     void *ad = mmap (NULL, 2 * YACA_SMALLREGION_SIZE,
@@ -253,8 +253,8 @@ yaca_new_smallregion (void)
   reg->reg_free = reg->reg_data;
   reg->reg_end = (char *) reg + YACA_SMALLREGION_SIZE;
   if (!reg->reg_end)
-    YACA_FATAL("unlucky small region ending at NIL");
-  allocated_megabytes += YACA_SMALLREGION_SIZE>>20;
+    YACA_FATAL ("unlucky small region ending at NIL");
+  allocated_megabytes += YACA_SMALLREGION_SIZE >> 20;
   goto end;
 end:
   pthread_mutex_unlock (&yaca_memory_mutex);
@@ -267,8 +267,8 @@ yaca_new_bigregion (void)
 {
   struct yaca_region_st *reg = NULL;
   pthread_mutex_lock (&yaca_memory_mutex);
-  if (YACA_UNLIKELY(4*bigregion.count + 50 > 3*bigregion.size))
-    reorganize_bigregion (bigregion.count/8+20);
+  if (YACA_UNLIKELY (4 * bigregion.count + 50 > 3 * bigregion.size))
+    reorganize_bigregion (bigregion.count / 8 + 20);
   // allocate the region
   {
     void *ad = mmap (NULL, 2 * YACA_BIGREGION_SIZE,
@@ -300,8 +300,8 @@ yaca_new_bigregion (void)
   reg->reg_free = reg->reg_data;
   reg->reg_end = (char *) reg + YACA_BIGREGION_SIZE;
   if (!reg->reg_end)
-    YACA_FATAL("unlucky big region ending at NIL");
-  allocated_megabytes += YACA_BIGREGION_SIZE>>20;
+    YACA_FATAL ("unlucky big region ending at NIL");
+  allocated_megabytes += YACA_BIGREGION_SIZE >> 20;
   goto end;
 end:
   pthread_mutex_unlock (&yaca_memory_mutex);
@@ -311,35 +311,39 @@ end:
 void
 yaca_delete_region (struct yaca_region_st *reg)
 {
-  if (!reg || reg==YACA_REGION_EMPTY) return;
+  if (!reg || reg == YACA_REGION_EMPTY)
+    return;
   pthread_mutex_lock (&yaca_memory_mutex);
-  if (reg->reg_magic == YACA_SMALLREGION_MAGIC) 
+  if (reg->reg_magic == YACA_SMALLREGION_MAGIC)
     {
-      assert ((uintptr_t)reg % YACA_SMALLREGION_SIZE == 0);
+      assert ((uintptr_t) reg % YACA_SMALLREGION_SIZE == 0);
       assert (smallregion.arr != NULL);
       assert (reg->reg_index < smallregion.size);
-      assert (smallregion.arr[reg->reg_index]==reg);
+      assert (smallregion.arr[reg->reg_index] == reg);
       smallregion.arr[reg->reg_index] = YACA_REGION_EMPTY;
       smallregion.count--;
-      if (YACA_UNLIKELY(smallregion.count < smallregion.size/4 && smallregion.size>230))
-	reorganize_smallregion (smallregion.count/8+20);
-      if (munmap ((char*)reg, YACA_SMALLREGION_SIZE))
-	YACA_FATAL("failed to unmap small region@%p - %m", (void*)reg);
-      allocated_megabytes -= YACA_BIGREGION_SIZE>>20;
+      if (YACA_UNLIKELY
+	  (smallregion.count < smallregion.size / 4
+	   && smallregion.size > 230))
+	reorganize_smallregion (smallregion.count / 8 + 20);
+      if (munmap ((char *) reg, YACA_SMALLREGION_SIZE))
+	YACA_FATAL ("failed to unmap small region@%p - %m", (void *) reg);
+      allocated_megabytes -= YACA_BIGREGION_SIZE >> 20;
     }
   else if (reg->reg_magic == YACA_BIGREGION_MAGIC)
     {
-      assert ((uintptr_t)reg % YACA_BIGREGION_SIZE == 0);
+      assert ((uintptr_t) reg % YACA_BIGREGION_SIZE == 0);
       assert (bigregion.arr != NULL);
       assert (reg->reg_index < bigregion.size);
-      assert (bigregion.arr[reg->reg_index]==reg);
+      assert (bigregion.arr[reg->reg_index] == reg);
       bigregion.arr[reg->reg_index] = YACA_REGION_EMPTY;
       bigregion.count--;
-      if (YACA_UNLIKELY(bigregion.count < bigregion.size/4 && bigregion.size>120))
-	reorganize_bigregion (bigregion.count/8+20);
-      if (munmap ((char*)reg, YACA_BIGREGION_SIZE))
-	YACA_FATAL("failed to unmap big region@%p - %m", (void*)reg);
-      allocated_megabytes -= YACA_BIGREGION_SIZE>>20;
+      if (YACA_UNLIKELY
+	  (bigregion.count < bigregion.size / 4 && bigregion.size > 120))
+	reorganize_bigregion (bigregion.count / 8 + 20);
+      if (munmap ((char *) reg, YACA_BIGREGION_SIZE))
+	YACA_FATAL ("failed to unmap big region@%p - %m", (void *) reg);
+      allocated_megabytes -= YACA_BIGREGION_SIZE >> 20;
     }
   goto end;
 end:
@@ -351,68 +355,73 @@ struct yaca_region_st *
 yaca_find_region (void *ptr)
 {
   struct yaca_region_st *reg = NULL;
-  if (!ptr || (uintptr_t)ptr<YACA_SMALLREGION_SIZE 
-      || (uintptr_t)ptr > UINTPTR_MAX-YACA_SMALLREGION_SIZE)
+  if (!ptr || (uintptr_t) ptr < YACA_SMALLREGION_SIZE
+      || (uintptr_t) ptr > UINTPTR_MAX - YACA_SMALLREGION_SIZE)
     return NULL;
   pthread_mutex_lock (&yaca_memory_mutex);
   // is it inside a small region?
   {
-    void* alptr = (void*) ((uintptr_t)ptr & ~(YACA_SMALLREGION_SIZE-1));
+    void *alptr = (void *) ((uintptr_t) ptr & ~(YACA_SMALLREGION_SIZE - 1));
     unsigned size = smallregion.size;
-    struct yaca_region_st** arr = smallregion.arr;
+    struct yaca_region_st **arr = smallregion.arr;
     assert (size > 2);
     assert (arr != NULL);
     uintptr_t h = ((uintptr_t) ptr / YACA_SMALLREGION_SIZE) % size;
-  for (unsigned ix = h; ix < size; ix++)
-    {
-      struct yaca_region_st *cureg = arr[ix];
-      if ((void*)cureg == alptr)
-	{ 
-	  reg = cureg;
+    for (unsigned ix = h; ix < size; ix++)
+      {
+	struct yaca_region_st *cureg = arr[ix];
+	if ((void *) cureg == alptr)
+	  {
+	    reg = cureg;
+	    break;
+	  }
+	else if (cureg == NULL)
 	  break;
-	}
-      else if (cureg == NULL)
-	break;
-    };
-  for (unsigned ix = 0; ix<h; ix++)
-    {
-      struct yaca_region_st *cureg = arr[ix];
-      if ((void*)cureg == alptr)
-	{
-	  reg = cureg;
+      };
+    for (unsigned ix = 0; ix < h; ix++)
+      {
+	struct yaca_region_st *cureg = arr[ix];
+	if ((void *) cureg == alptr)
+	  {
+	    reg = cureg;
+	    break;
+	  }
+	else if (cureg == NULL)
 	  break;
-	}
-      else if (cureg == NULL)
-	break;
-    };
+      };
   }
   // is it inside a big region?
-  if (!reg) {
-    void* alptr = (void*) ((uintptr_t)ptr & ~(YACA_BIGREGION_SIZE-1));
-    unsigned size = bigregion.size;
-    struct yaca_region_st** arr = bigregion.arr;
-    assert (size > 2);
-    assert (arr != NULL);
-    uintptr_t h = ((uintptr_t) ptr / YACA_BIGREGION_SIZE) % size;
-  for (unsigned ix = h; ix < size; ix++)
+  if (!reg)
     {
-      struct yaca_region_st *cureg = arr[ix];
-      if ((void*)cureg == alptr)
-	{reg = cureg;
-	  break;}
-      else if (cureg == NULL)
-	goto end;
-    };
-  for (unsigned ix = 0; ix<h; ix++)
-    {
-      struct yaca_region_st *cureg = arr[ix];
-      if ((void*)cureg == alptr)
-	{reg = cureg;
-	  break;}
-      else if (cureg == NULL)
-	goto end;
-    };
-  }
+      void *alptr = (void *) ((uintptr_t) ptr & ~(YACA_BIGREGION_SIZE - 1));
+      unsigned size = bigregion.size;
+      struct yaca_region_st **arr = bigregion.arr;
+      assert (size > 2);
+      assert (arr != NULL);
+      uintptr_t h = ((uintptr_t) ptr / YACA_BIGREGION_SIZE) % size;
+      for (unsigned ix = h; ix < size; ix++)
+	{
+	  struct yaca_region_st *cureg = arr[ix];
+	  if ((void *) cureg == alptr)
+	    {
+	      reg = cureg;
+	      break;
+	    }
+	  else if (cureg == NULL)
+	    goto end;
+	};
+      for (unsigned ix = 0; ix < h; ix++)
+	{
+	  struct yaca_region_st *cureg = arr[ix];
+	  if ((void *) cureg == alptr)
+	    {
+	      reg = cureg;
+	      break;
+	    }
+	  else if (cureg == NULL)
+	    goto end;
+	};
+    }
   goto end;
 end:
   pthread_mutex_unlock (&yaca_memory_mutex);
@@ -442,42 +451,60 @@ yaca_initialize_memgc (void)
   }
 }
 
-long yaca_allocated_megabytes(void)
+long
+yaca_allocated_megabytes (void)
 {
   return allocated_megabytes;
 }
 
 
-static pthread_mutex_t workalloc_mutex  = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t workalloc_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // allocate from a worker (preferably), and ask for GC when needed
-void* 
-yaca_work_allocate(unsigned siz)
+void *
+yaca_work_allocate (unsigned siz)
 {
-  struct yaca_region_st*reg = NULL;
-  if (YACA_UNLIKELY(siz == 0)) 
+  struct yaca_region_st *reg = NULL;
+  if (YACA_UNLIKELY (siz == 0))
     return NULL;
-  if (YACA_LIKELY(yaca_this_worker 
-		  && siz < YACA_SMALLREGION_SIZE/2
-		  && yaca_this_worker->worker_num > 0 
-		  && yaca_this_worker->worker_magic == YACA_WORKER_MAGIC
-		  && (reg=yaca_this_worker->worker_region) != NULL))
+  if (YACA_LIKELY (yaca_this_worker
+		   && siz < YACA_SMALLREGION_SIZE / 2
+		   && yaca_this_worker->worker_num > 0
+		   && yaca_this_worker->worker_magic == YACA_WORKER_MAGIC
+		   && (reg = yaca_this_worker->worker_region) != NULL))
     {
-      void* p = yaca_allocate_in_region (reg, siz);
-      if (p) return p;
-      struct yaca_region_st* newreg = yaca_new_smallregion();
+      void *p = yaca_allocate_in_region (reg, siz);
+      if (p)
+	return p;
+      struct yaca_region_st *newreg = yaca_new_smallregion ();
       newreg->reg_next = reg;
       yaca_this_worker->worker_region = newreg;
       yaca_should_garbage_collect ();
-  } 
-  else {
-    pthread_mutex_lock (&workalloc_mutex);
+    }
+  else
+    {
+      pthread_mutex_lock (&workalloc_mutex);
 #warning incomplete yaca_work_allocate
-    pthread_mutex_unlock (&workalloc_mutex);
-  }
+      pthread_mutex_unlock (&workalloc_mutex);
+    }
 }
 
-void yaca_should_garbage_collect (void)
+// this is the work routine of the GC thread
+void *
+yaca_gcthread_work (void *d)
 {
-#warning unimplemented yaca_should_garbage_collect
+  struct yaca_worker_st *tsk = (struct yaca_worker_st *) d;
+  if (!tsk || tsk->worker_magic != YACA_WORKER_MAGIC)
+    YACA_FATAL ("invalid worker@%p", tsk);
+  assert (tsk->worker_num == -(int) yacaworker_gc);
+  yaca_this_worker = tsk;
+  sched_yield ();
+#warning incomplete yaca_gcthread_work
+}
+
+// this is called by worker threads when GC is needed
+void
+yaca_worker_garbcoll (void)
+{
+#warning yaca_worker_garbcoll incomplete
 }

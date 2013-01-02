@@ -87,7 +87,7 @@ static struct yaca_worker_st yaca_fcgiworker;
 
 
 static void *yaca_worker_work (void *);
-static void *yaca_gc_work (void *);
+
 
 // return false if agenda stopped
 static bool yaca_do_one_task (void);
@@ -122,7 +122,7 @@ yaca_start_agenda (void)
     assert (!tsk->worker_thread);
     tsk->worker_num = -(int) yacaworker_gc;
     tsk->worker_magic = YACA_WORKER_MAGIC;
-    pthread_create (&tsk->worker_thread, NULL, yaca_gc_work, tsk);
+    pthread_create (&tsk->worker_thread, NULL, yaca_gcthread_work, tsk);
   }
   goto end;
 end:
@@ -130,7 +130,7 @@ end:
 }
 
 void
-yaca_interrupt_agenda (void)
+yaca_interrupt_agenda (enum yaca_interrupt_reason_en ireas)
 {
   pthread_mutex_lock (&yaca_agenda_mutex);
   yaca_interrupt = 1;
@@ -139,6 +139,8 @@ yaca_interrupt_agenda (void)
       struct yaca_worker_st *tsk = yaca_worktab + ix;
       assert (tsk->worker_magic == YACA_WORKER_MAGIC);
       tsk->worker_interrupted = 1;
+      if (ireas > yaint__none && ireas < yaint__last)
+	tsk->worker_need |= (1 << (int) ireas);
       pthread_kill (tsk->worker_thread, YACA_WORKER_SIGNAL);
     }
   goto end;
@@ -202,21 +204,19 @@ yaca_worker_work (void *d)
       cnt++;
       if (YACA_UNLIKELY (cnt % 1024 == 0))
 	sched_yield ();
+      uint32_t need = 0;
+      {
+	pthread_mutex_lock (&yaca_agenda_mutex);
+	need = tsk->worker_need;
+	tsk->worker_need = 0;
+	pthread_mutex_unlock (&yaca_agenda_mutex);
+      }
+      if (need & (1 << yaint_gc))
+	yaca_worker_garbcoll ();
     }
 #warning incomplete yaca_worker_work
 }
 
-void *
-yaca_gc_work (void *d)
-{
-  struct yaca_worker_st *tsk = (struct yaca_worker_st *) d;
-  if (!tsk || tsk->worker_magic != YACA_WORKER_MAGIC)
-    YACA_FATAL ("invalid worker@%p", tsk);
-  assert (tsk->worker_num == -(int) yacaworker_gc && tsk == &yaca_gcworker);
-  yaca_this_worker = tsk;
-  sched_yield ();
-#warning incomplete yaca_gc_work
-}
 
 static void
 initialize_agenda (unsigned sizlow)
@@ -677,4 +677,10 @@ yaca_agenda_stop (void)
 end:
   pthread_mutex_unlock (&yaca_agenda_mutex);
 #warning should wait for all workers to stop
+}
+
+void
+yaca_should_garbage_collect (void)
+{
+  yaca_interrupt_agenda (yaint_gc);
 }
