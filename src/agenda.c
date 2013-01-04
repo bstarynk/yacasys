@@ -647,6 +647,10 @@ yaca_do_one_task (void)
   }
   goto end;
 end:
+  if (agitm)
+    yaca_this_worker->worker_state = yawrk_run;
+  else
+    yaca_this_worker->worker_state = yawrk_idle;
   pthread_mutex_unlock (&yaca_agenda_mutex);
   if (agitm)
     {

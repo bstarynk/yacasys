@@ -28,7 +28,20 @@
    Data in memory region may be copied.
 **/
 
+// mutex for regions 
 static pthread_mutex_t yaca_memory_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+
+// mutex for work allocation
+static pthread_mutex_t yaca_workalloc_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+
+// non-worker common small region
+static struct yaca_region_st *yaca_common_smallreg;
+
+// comon big region
+static struct yaca_region_st *yaca_common_bigreg;
+
 
 // hashtable for small & big regions
 static struct
@@ -449,6 +462,9 @@ yaca_initialize_memgc (void)
       YACA_FATAL ("failed to allocate big region array (%d) - %m", (int) siz);
     bigregion.size = siz;
   }
+  // initialize the common regions
+  yaca_common_smallreg = yaca_new_smallregion ();
+  yaca_common_bigreg = yaca_new_bigregion ();
 }
 
 long
@@ -458,7 +474,6 @@ yaca_allocated_megabytes (void)
 }
 
 
-static pthread_mutex_t workalloc_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // allocate from a worker (preferably), and ask for GC when needed
 void *
@@ -483,9 +498,34 @@ yaca_work_allocate (unsigned siz)
     }
   else
     {
-      pthread_mutex_lock (&workalloc_mutex);
-#warning incomplete yaca_work_allocate
-      pthread_mutex_unlock (&workalloc_mutex);
+      void *ad = NULL;
+      pthread_mutex_lock (&yaca_workalloc_mutex);
+      if (siz < YACA_SMALLREGION_SIZE / 2)
+	{
+	  ad = yaca_allocate_in_region (yaca_common_smallreg, siz);
+	  if (YACA_UNLIKELY (ad == NULL))
+	    {
+	      struct yaca_region_st *newreg = yaca_new_smallregion ();
+	      newreg->reg_next = yaca_common_smallreg;
+	      yaca_common_smallreg = newreg;
+	      ad = yaca_allocate_in_region (yaca_common_smallreg, siz);
+	      yaca_should_garbage_collect ();
+	    }
+	}
+      else if (siz < YACA_BIGREGION_SIZE / 2)
+	{
+	  ad = yaca_allocate_in_region (yaca_common_bigreg, siz);
+	  if (YACA_UNLIKELY (ad == NULL))
+	    {
+	      struct yaca_region_st *newreg = yaca_new_bigregion ();
+	      newreg->reg_next = yaca_common_bigreg;
+	      yaca_common_bigreg = newreg;
+	      ad = yaca_allocate_in_region (yaca_common_bigreg, siz);
+	      yaca_should_garbage_collect ();
+	    }
+	}
+      pthread_mutex_unlock (&yaca_workalloc_mutex);
+      return ad;
     }
 }
 
@@ -506,5 +546,7 @@ yaca_gcthread_work (void *d)
 void
 yaca_worker_garbcoll (void)
 {
+  // set this worker's state to start_gc
+  // wait till all worker's state is start_gc
 #warning yaca_worker_garbcoll incomplete
 }

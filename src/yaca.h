@@ -231,6 +231,16 @@ enum yaca_agenda_state_en
   yacag_run,
 };
 
+enum yaca_worker_state_en
+{
+  yawrk__none = 0,
+  yawrk_idle,
+  yawrk_run,
+  yawrk_start_gc,
+  yawrk__last = 0
+};
+
+
 enum yaca_interrupt_reason_en
 {
   yaint__none = 0,
@@ -302,6 +312,8 @@ void *yaca_gcthread_work (void *);
 
 // this is called by worker threads when GC is needed
 void yaca_worker_garbcoll (void);
+
+
 
 #endif /* _YACA_H_INCLUDED_ */
 /* eof yacasys/yaca.h */
