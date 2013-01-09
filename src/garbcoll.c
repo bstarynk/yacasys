@@ -546,7 +546,10 @@ yaca_gcthread_work (void *d)
 void
 yaca_worker_garbcoll (void)
 {
+  assert (yaca_this_worker
+	  && yaca_this_worker->worker_magic == YACA_WORKER_MAGIC);
   // set this worker's state to start_gc
+  yaca_this_worker->worker_state = yawrk_start_gc;
   // wait till all worker's state is start_gc
 #warning yaca_worker_garbcoll incomplete
 }

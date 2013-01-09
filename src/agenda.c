@@ -111,7 +111,7 @@ yaca_start_agenda (void)
   for (unsigned ix = 1; ix <= yaca_nb_workers; ix++)
     {
       struct yaca_worker_st *tsk = yaca_worktab + ix;
-      assert (!tsk->worker_thread);
+      assert (tsk->worker_thread != 0);
       tsk->worker_num = ix;
       tsk->worker_magic = YACA_WORKER_MAGIC;
       pthread_create (&tsk->worker_thread, NULL, yaca_worker_work, tsk);
@@ -681,6 +681,46 @@ yaca_agenda_stop (void)
 end:
   pthread_mutex_unlock (&yaca_agenda_mutex);
 #warning should wait for all workers to stop
+}
+
+void
+yaca_wait_workers_all_at_state (unsigned state)
+{
+  assert (yaca_nb_workers >= 2 && yaca_nb_workers <= YACA_MAX_WORKERS);
+  pthread_mutex_lock (&yaca_agenda_mutex);
+  if (yaca_this_worker && yaca_this_worker->worker_magic == YACA_WORKER_MAGIC)
+    {
+      yaca_this_worker->worker_state = state;
+      pthread_cond_broadcast (&yaca_agendachanged_cond);
+    }
+  bool allatstate = true;
+  do
+    {
+      for (unsigned ix = 1; ix <= yaca_nb_workers; ix++)
+	{
+	  struct yaca_worker_st *tsk = yaca_worktab + ix;
+	  assert (tsk->worker_thread != 0);
+	  if (tsk->worker_state != state)
+	    allatstate = false;
+	}
+      if (!allatstate)
+	{
+	  struct timespec ts = { 0, 0 };
+	  clock_gettime (CLOCK_REALTIME, &ts);
+	  ts.tv_nsec += 2 * YACA_WORKER_TICKMILLISEC * 1000000;
+	  while (YACA_UNLIKELY (ts.tv_nsec > 1000000000))
+	    {
+	      ts.tv_sec++;
+	      ts.tv_nsec -= 1000000000;
+	    };
+	  pthread_cond_timedwait (&yaca_agendachanged_cond,
+				  &yaca_agenda_mutex, &ts);
+	}
+    }
+  while (!allatstate);
+  goto end;
+end:
+  pthread_mutex_unlock (&yaca_agenda_mutex);
 }
 
 void

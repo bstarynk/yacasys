@@ -267,7 +267,7 @@ void yaca_load (void);
 
 void yaca_start_agenda (void);
 void yaca_interrupt_agenda (enum yaca_interrupt_reason_en reason);
-void yaca_stop_agenda (void);
+
 enum yaca_taskprio_en
 {
   tkprio__none,
@@ -298,6 +298,9 @@ void yaca_agenda_stop (void);
 
 // initialize memory management & garbage collection
 void yaca_initialize_memgc (void);
+
+// wait till all workers reached the current state
+void yaca_wait_workers_all_at_state (unsigned state);
 
 // allocate from a worker (preferably), and ask for GC when needed
 void *yaca_work_allocate (unsigned siz);
