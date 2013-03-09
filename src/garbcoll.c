@@ -539,6 +539,7 @@ yaca_gcthread_work (void *d)
   assert (tsk->worker_num == -(int) yacaworker_gc);
   yaca_this_worker = tsk;
   sched_yield ();
+  yaca_wait_workers_all_at_state (yawrk_start_gc);
 #warning incomplete yaca_gcthread_work
 }
 
@@ -548,8 +549,9 @@ yaca_worker_garbcoll (void)
 {
   assert (yaca_this_worker
 	  && yaca_this_worker->worker_magic == YACA_WORKER_MAGIC);
-  // set this worker's state to start_gc
-  yaca_this_worker->worker_state = yawrk_start_gc;
   // wait till all worker's state is start_gc
+  yaca_wait_workers_all_at_state (yawrk_start_gc);
 #warning yaca_worker_garbcoll incomplete
 }
+
+// eof garbcoll.c

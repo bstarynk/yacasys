@@ -104,10 +104,31 @@ typedef void yaca_runitem_sig_t (struct yaca_item_st *);
 typedef void yaca_scandump_sig_t (struct yaca_item_st *,
 				  struct yaca_dumper_st *);
 
+
+// make a new item
+struct yaca_item_st *yaca_item_make (yaca_typenum_t typnum,
+				     yaca_spacenum_t spacenum,
+				     unsigned extrasize);
+// build an item of given id, useful at load time
+struct yaca_item_st *yaca_item_build (yaca_typenum_t typnum,
+				      yaca_spacenum_t spacenum,
+				      unsigned extrasize, yaca_id_t id);
+// get the item of a given id
+struct yaca_item_st *yaca_item_of_id (yaca_id_t id);
+
+
+typedef struct yaca_item_st *yaca_loaditem_sig_t (json_t *, yaca_id_t);
+typedef void yaca_fillitem_sig_t (json_t *, struct yaca_item_st *);
+typedef json_t *yaca_dumpitem_sig_t (struct yaca_item_st *);
+typedef json_t *yaca_dumpcontent_sig_t (struct yaca_item_st *);
+typedef void yaca_runitem_sig_t (struct yaca_item_st *);
+typedef void yaca_scandump_sig_t (struct yaca_item_st *,
+				  struct yaca_dumper_st *);
+
 ///// items
 
 #define YACA_ITEM_MAGIC 971394241	/*0x39e64cc1 */
-struct yaca_item_st
+struct yaca_item_st		// in calloc-ed memory, and explicitly free-d by the GC
 {
   uint32_t itm_magic;		/* always YACA_ITEM_MAGIC */
   yaca_id_t itm_id;
@@ -118,13 +139,20 @@ struct yaca_item_st
 };
 #define YACA_ITEM_MAX_SIZE (256*1024*sizeof(void*))
 
+// make a new item
 struct yaca_item_st *yaca_item_make (yaca_typenum_t typnum,
 				     yaca_spacenum_t spacenum,
 				     unsigned extrasize);
+// build an item of given id, useful at load time
 struct yaca_item_st *yaca_item_build (yaca_typenum_t typnum,
 				      yaca_spacenum_t spacenum,
 				      unsigned extrasize, yaca_id_t id);
+// get the item of a given id
 struct yaca_item_st *yaca_item_of_id (yaca_id_t id);
+
+// touch an item (write barrier for the GC) --forwarded definition
+static inline void yaca_item_touch (struct yaca_item_st *itm);
+
 
 struct yaca_tupleitems_st
 {
@@ -248,6 +276,7 @@ enum yaca_interrupt_reason_en
   yaint__last
 };
 
+#define YACA_WORKER_TOUCH_CACHE_LEN 17	/* a small prime number */
 #define YACA_WORKER_MAGIC 471856441	/*0x1c1ff539 */
 struct yaca_worker_st
 {
@@ -259,6 +288,7 @@ struct yaca_worker_st
   uint32_t worker_need;
   struct yaca_region_st *worker_region;
   volatile sig_atomic_t worker_interrupted;
+  struct yaca_item_st *worker_touchcache[YACA_WORKER_TOUCH_CACHE_LEN];
 };
 
 #define YACA_WORKER_SIGNAL SIGALRM
@@ -317,6 +347,25 @@ void *yaca_gcthread_work (void *);
 void yaca_worker_garbcoll (void);
 
 
+static inline void
+yaca_item_touch (struct yaca_item_st *itm)
+{
+  extern void yaca_item_really_touch (struct yaca_item_st *);
+  if (YACA_UNLIKELY (itm == NULL))
+    return;
+  assert (itm->itm_magic == YACA_ITEM_MAGIC);
+  if (yaca_this_worker)
+    {
+      yaca_id_t id = itm->itm_id;
+      if (yaca_this_worker->
+	  worker_touchcache[id % YACA_WORKER_TOUCH_CACHE_LEN] == itm
+	  || yaca_this_worker->worker_touchcache[(id + 1) %
+						 YACA_WORKER_TOUCH_CACHE_LEN]
+	  == itm)
+	return;
+    }
+  yaca_item_really_touch (itm);
+}
 
 #endif /* _YACA_H_INCLUDED_ */
 /* eof yacasys/yaca.h */

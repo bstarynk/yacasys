@@ -433,6 +433,13 @@ yaca_prime_after (unsigned long l)
   return 0;
 }
 
+
+void
+yaca_item_really_touch (struct yaca_item_st *itm)
+{
+#warning unimplemented yaca_item_really_touch
+}
+
 int
 main (int argc, char **argv)
 {
